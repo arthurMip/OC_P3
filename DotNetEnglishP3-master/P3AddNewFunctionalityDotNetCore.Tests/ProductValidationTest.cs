@@ -16,13 +16,13 @@ namespace P3AddNewFunctionalityDotNetCore.Tests
             // Arrange
             var product = new ProductViewModel { Name = name, Price = price, Stock = stock };
             var context = new ValidationContext(product, null, null);
+            var results = new List<ValidationResult>();
 
             // Act
-            var errors = new List<ValidationResult>();
-            Validator.TryValidateObject(product, context, errors, true);
+            Validator.TryValidateObject(product, context, results, true);
 
             // Assert
-            errors.Should().BeEmpty();
+            results.Should().BeEmpty();
         }
 
         [Theory]
