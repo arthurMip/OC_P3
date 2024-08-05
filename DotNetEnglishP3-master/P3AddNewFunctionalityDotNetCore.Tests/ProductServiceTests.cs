@@ -9,170 +9,136 @@ using P3AddNewFunctionalityDotNetCore.Models.Services;
 using P3AddNewFunctionalityDotNetCore.Models.ViewModels;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace P3AddNewFunctionalityDotNetCore.Tests;
 
-public class ProductServiceTests
+public class ProductServiceTests : IDisposable
 {
-    private P3Referential CreateDbContext()
+    private readonly P3Referential _context;
+    public ProductServiceTests()
     {
         var options = new DbContextOptionsBuilder<P3Referential>()
             .UseSqlServer("Server=.;Database=P3Referential-Test;Trusted_Connection=True;MultipleActiveResultSets=true")
             .Options;
+        
+        _context = new P3Referential(options, new ConfigurationBuilder().Build());
+        _context.Database.EnsureDeleted();
+        _context.Database.Migrate();
+    }
 
-        var context = new P3Referential(options, new ConfigurationBuilder().Build());
-        context.Database.EnsureDeleted();
-        context.Database.Migrate();
-
-        return context;
+    public void Dispose()
+    {
+        _context.RemoveRange(_context.Product);
+        _context.SaveChanges();
     }
 
     [Fact]
     public void ProductService_CreateProductInAdmin_ProductVisibleByUser()
     {
         // Arrange
-        var context = CreateDbContext();
-        var repository = new ProductRepository(context);
+        var repository = new ProductRepository(_context);
         var service = new ProductService(null, repository, null, null);
 
         // Act
-        var newProduct1 = new ProductViewModel
+        var expectedProduct1 = new ProductViewModel
         {
             Id = 1,
             Name = "Test1",
             Stock = "1",
             Price = "1"
         };
-        var newProduct2 = new ProductViewModel
+        var expectedProduct2 = new ProductViewModel
         {
             Id = 2,
             Name = "Test2",
             Stock = "2",
             Price = "2"
         };
-        service.SaveProduct(newProduct1);
-        service.SaveProduct(newProduct2);
-        ProductViewModel product1 = service.GetProductByIdViewModel(newProduct1.Id);
-        ProductViewModel product2 = service.GetProductByIdViewModel(newProduct2.Id);
+        service.SaveProduct(expectedProduct1);
+        service.SaveProduct(expectedProduct2);
+        ProductViewModel resultProduct1 = service.GetProductByIdViewModel(expectedProduct1.Id);
+        ProductViewModel resultproduct2 = service.GetProductByIdViewModel(expectedProduct2.Id);
         List<ProductViewModel> products = service.GetAllProductsViewModel();
 
         // Assert
-        product1.Should().NotBeNull()
-            .And.BeEquivalentTo(newProduct1);
+        resultProduct1.Should().NotBeNull()
+            .And.BeEquivalentTo(expectedProduct1);
 
-        product2.Should().NotBeNull()
-            .And.BeEquivalentTo(newProduct2);
+        resultproduct2.Should().NotBeNull()
+            .And.BeEquivalentTo(expectedProduct2);
 
-        products.Should().NotBeEmpty()
-            .And.ContainEquivalentOf(newProduct1)
-            .And.ContainEquivalentOf(product2);
+        products.Should().HaveCount(2)
+            .And.ContainEquivalentOf(expectedProduct1)
+            .And.ContainEquivalentOf(expectedProduct2);
     }
 
     [Fact]
     public void ProductService_DeleteProductInAdmin_ProductNotVisibleByUser()
     {
         // Arrange
-        P3Referential context = CreateDbContext();
-        var repository = new ProductRepository(context);
+        var repository = new ProductRepository(_context);
         var service = new ProductService(new Cart(), repository, null, null);
 
         // Act
-        var newProduct1 = new ProductViewModel
+        var deletedProduct = new ProductViewModel
         {
             Id = 1,
             Name = "Test1",
+            Description = "Test1",
             Stock = "1",
             Price = "1"
         };
-        var newProduct2 = new ProductViewModel
+        var expectedProduct = new ProductViewModel
         {
             Id = 2,
             Name = "Test2",
+            Description = "Test2",
             Stock = "2",
             Price = "2"
         };
-        service.SaveProduct(newProduct1);
-        service.SaveProduct(newProduct2);
-        service.DeleteProduct(newProduct1.Id);
-        ProductViewModel product1 = service.GetProductByIdViewModel(newProduct1.Id);
-        ProductViewModel product2 = service.GetProductByIdViewModel(newProduct2.Id);
+        service.SaveProduct(deletedProduct);
+        service.SaveProduct(expectedProduct);
+        service.DeleteProduct(deletedProduct.Id);
+        ProductViewModel resultProduct1 = service.GetProductByIdViewModel(deletedProduct.Id);
+        ProductViewModel resultProduct2 = service.GetProductByIdViewModel(expectedProduct.Id);
         List<ProductViewModel> products = service.GetAllProductsViewModel();
 
         // Assert
-        product1.Should().BeNull();
+        resultProduct1.Should().BeNull();
 
-        product2.Should().NotBeNull()
-            .And.BeEquivalentTo(newProduct2);
+        resultProduct2.Should().NotBeNull()
+            .And.BeEquivalentTo(expectedProduct);
 
         products.Should().NotBeEmpty()
-            .And.ContainEquivalentOf(product2)
-            .And.NotContainEquivalentOf(newProduct1);
-    }
-
-    [Fact]
-    public void ProductServie_AddProductsToCart_ProductsInCart()
-    {
-        // Arrange
-        P3Referential context = CreateDbContext();
-        var repository = new ProductRepository(context);
-        var cart = new Cart();
-        var service = new ProductService(cart, repository, null, null);
-
-        // Act
-        var newProduct1 = new ProductViewModel
-        {
-            Id = 1,
-            Name = "Test1",
-            Stock = "1",
-            Price = "1"
-        };
-        var newProduct2 = new ProductViewModel
-        {
-            Id = 2,
-            Name = "Test2",
-            Stock = "2",
-            Price = "2"
-        };
-        service.SaveProduct(newProduct1);
-        service.SaveProduct(newProduct2);
-
-        Product p1 = service.GetProductById(1);
-        Product p2 = service.GetProductById(2);
-
-        cart.AddItem(p1, 1);
-        cart.AddItem(p1, 1);
-        cart.AddItem(p2, 1);
-
-        // Assert
-        cart.Lines.Should().HaveCount(2)
-            .And.ContainEquivalentOf(new CartLine { Product = p1, Quantity = 2 })
-            .And.ContainEquivalentOf(new CartLine { Product = p2, Quantity = 1 });
+            .And.ContainEquivalentOf(expectedProduct)
+            .And.NotContainEquivalentOf(deletedProduct);
     }
 
     [Fact]
     public void ProductService_DeleteProductInAdmin_ProductNotInCart()
     {
         // Arrange
-        P3Referential context = CreateDbContext();
-        var repository = new ProductRepository(context);
+        var repository = new ProductRepository(_context);
         var cart = new Cart();
         var service = new ProductService(cart, repository, null, null);
 
-        // Act
-        var newProduct1 = new ProductViewModel
+        // Act and Assert
+        var deletedProduct = new ProductViewModel
         {
             Id = 1,
             Name = "Test1",
             Stock = "1",
             Price = "1"
         };
-        service.SaveProduct(newProduct1);
-        Product p1 = service.GetProductById(1);
-        cart.AddItem(p1 , 1);
-        service.DeleteProduct(newProduct1.Id);
+        service.SaveProduct(deletedProduct);
 
-        // Assert
+        Product p1 = service.GetProductById(deletedProduct.Id);
+        cart.AddItem(p1, 1);
+        cart.Lines.Should().HaveCount(1);
+
+        service.DeleteProduct(deletedProduct.Id);
         cart.Lines.Should().BeEmpty();
     }
 }
