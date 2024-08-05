@@ -9,12 +9,11 @@ namespace P3AddNewFunctionalityDotNetCore.Tests
 {
     public class ProductValidationTest
     {
-        [Theory]
-        [InlineData("Arthur", "9.95", "420")]
-        public void ModelErrors_ValidProduct_NoErrors(string name, string price, string stock)
+        [Fact]
+        public void ModelErrors_ValidProduct_NoErrors()
         {
             // Arrange
-            var product = new ProductViewModel { Name = name, Price = price, Stock = stock };
+            var product = new ProductViewModel { Name = "Bob", Price = "9.95", Stock = "10" };
             var context = new ValidationContext(product, null, null);
             var results = new List<ValidationResult>();
 
@@ -61,12 +60,11 @@ namespace P3AddNewFunctionalityDotNetCore.Tests
             results.Select(r => r.ErrorMessage).Should().Contain("MissingPrice");
         }
 
-        [Theory]
-        [InlineData("abc")]
-        public void ModelErrors_PriceIsLetters_PriceNotANumber(string price)
+        [Fact]
+        public void ModelErrors_PriceIsLetters_PriceNotANumber()
         {
             // Arrange
-            var product = new ProductViewModel { Price = price };
+            var product = new ProductViewModel { Price = "abs" };
             var context = new ValidationContext(product, null, null) { MemberName = "Price" };
             var results = new List<ValidationResult>();
 
